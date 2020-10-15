@@ -364,15 +364,18 @@ class LGCA_Square(LGCA_base):
             ani = animation.FuncAnimation(fig, update, interval=interval)
             return ani
 
-    def live_animate_density(self, interval=100, **kwargs):
+    def live_animate_density(self, interval=100, channels=slice(None), **kwargs):
 
-        fig, pc, cmap = self.plot_density(**kwargs)
+        fig, pc, cmap = self.plot_density(channels=channels, **kwargs)
         title = plt.title('Time $k =$0')
 
         def update(n):
             self.timestep()
             title.set_text('Time $k =${}'.format(n))
-            pc.set(facecolor=cmap.to_rgba(self.cell_density[self.nonborder].ravel()))
+            nodes = self.nodes[self.nonborder]
+            print(nodes[..., channels].shape)
+            dens = nodes[..., channels].sum(-1)
+            pc.set(facecolor=cmap.to_rgba(dens.ravel()))
             return pc, title
 
         ani = animation.FuncAnimation(fig, update, interval=interval)
@@ -490,10 +493,11 @@ class LGCA_Square(LGCA_base):
 
         return fig, pc, cmap
 
-    def plot_density(self, density=None, figindex=None, figsize=None, tight_layout=True, cmap='viridis', vmax=None,
-                     edgecolor='None', cbar=True):
+    def plot_density(self, density=None, channels=slice(None), figindex=None, figsize=None, tight_layout=True,
+                     cmap='viridis', vmax=None, edgecolor='None', cbar=True, cbarlabel='Particle number $n$'):
         if density is None:
-            density = self.cell_density[self.nonborder]
+            nodes = self.nodes[self.nonborder]
+            density = nodes[..., channels].sum(-1)
 
         if figsize is None:
             figsize = estimate_figsize(density, cbar=True, dy=self.dy)
@@ -521,7 +525,7 @@ class LGCA_Square(LGCA_base):
             divider = make_axes_locatable(ax)
             cax = divider.append_axes("right", size="5%", pad=0.1)
             cbar = fig.colorbar(cmap, extend='min', use_gridspec=True, cax=cax)
-            cbar.set_label('Particle number $n$')
+            cbar.set_label(cbarlabel)
             cbar.set_ticks(np.linspace(0., K + 1, 2 * K + 3, endpoint=True)[1::2])
             cbar.set_ticklabels(1 + np.arange(K))
             plt.sca(ax)
@@ -579,9 +583,14 @@ class LGCA_Square(LGCA_base):
 
         return fig, pc, cmap
 
-    def animate_density(self, density_t=None, interval=100, **kwargs):
+    def animate_density(self, density_t=None, interval=100, channels=slice(None), repeat=True, **kwargs):
         if density_t is None:
-            density_t = self.dens_t
+            if channels == slice(None):
+                density_t = self.dens_t
+
+            else:
+                nodes_t = self.nodes_t[..., channels]
+                density_t = nodes_t.sum(-1)
 
         fig, pc, cmap = self.plot_density(density_t[0], **kwargs)
         title = plt.title('Time $k =$0')
@@ -591,7 +600,7 @@ class LGCA_Square(LGCA_base):
             pc.set(facecolor=cmap.to_rgba(density_t[n, ...].ravel()))
             return pc, title
 
-        ani = animation.FuncAnimation(fig, update, interval=interval, frames=density_t.shape[0])
+        ani = animation.FuncAnimation(fig, update, interval=interval, frames=density_t.shape[0], repeat=repeat)
         return ani
 
     def animate_flux(self, nodes_t=None, interval=100, **kwargs):
@@ -646,54 +655,3 @@ class LGCA_Square(LGCA_base):
         ani = animation.FuncAnimation(fig, update, interval=interval)
         return ani
 
-class IBLGCA_Square(IBLGCA_base, LGCA_Square):
-    """
-    Identity-based LGCA simulator class.
-    """
-
-    def init_nodes(self, density=0.1, nodes=None):
-        self.nodes = np.zeros((self.lx + 2 * self.r_int, self.ly + 2 * self.r_int, self.K), dtype=np.uint)
-        if nodes is None:
-            self.random_reset(density)
-
-        else:
-            self.nodes[self.nonborder] = nodes.astype(np.uint)
-            self.maxlabel = self.nodes.max()
-
-    def plot_prop_spatial(self, nodes=None, props=None, propname=None, **kwargs):
-        if nodes is None:
-            nodes = self.nodes[self.nonborder]
-
-        if props is None:
-            props = self.props
-
-        if propname is None:
-            propname = list(props)[0]
-
-        lx, ly, _ = nodes.shape
-        mask = np.any(nodes, axis=-1)
-        meanprop = self.calc_prop_mean(propname=propname, props=props, nodes=nodes)
-        fig, pc, cmap = self.plot_scalarfield(meanprop, mask=mask, **kwargs)
-        return fig, pc, cmap
-
-
-if __name__ == '__main__':
-    lx = 50
-    ly = lx
-    restchannels = 4
-    nodes = np.zeros((lx, ly, 4 + restchannels))
-    nodes[0] = 1
-    lgca = IBLGCA_Square(restchannels=restchannels, lx=lx, ly=ly, bc='refl', nodes=nodes,
-                         interaction='go_and_grow', r_b=0.1, std=0.01)
-    # lgca.timeevo(200, record=True)
-    # lgca.plot_prop_spatial(propname='r_b', cbarlabel='$r_b$')
-    # print(lgca.cell_density[lgca.nonborder])
-    # ani = lgca.animate_flow(interval=50)
-    # ani = lgca.animate_flux(interval=100)
-    # ani = lgca.animate_density(interval=10)
-    # ani = lgca.live_animate_flux()
-    ani = lgca.live_animate_density()
-    # lgca.plot_flux()
-    # lgca.plot_density()
-    # lgca.plot_config(grid=True)
-    plt.show()
