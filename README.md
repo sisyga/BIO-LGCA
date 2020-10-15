@@ -1,3 +1,3 @@
-# BIO-LGCA - A Mesosocopic Modelling Framework for Collective Phenomena
+# BIO-LGCA - A cellular automaton modelling class for analyzing collective cell migration
 
-We want to design a python library as a piece of public software, that can be used in ongoing research as well as to exemplify the unique advantages of BIO-LGCAs.
+To overcome drawbacks of classical on-lattice models, we introduce a novelon-lattice, agent-based modelling class for collective cell migration, which we callbiological lattice-gas cellular automaton (BIO-LGCA). The BIO-LGCA is char-acterised by synchronous time updates, and the explicit consideration of individ-ual cell velocities.
