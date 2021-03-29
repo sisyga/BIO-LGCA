@@ -238,6 +238,44 @@ def wetting(lgca):
     lgca.ecm -= lgca.alpha * lgca.ecm * lgca.cell_density / lgca.K
 
 
+def coll_migr(lgca):
+    """
+    Collective migration including 3 mechanisms: alignment beta_al, aggregation beta_ag, steric interactions beta_s
+    :param n_crit:
+    :param lgca:
+    :return:
+    """
+    newnodes = lgca.nodes.copy()
+    relevant = (lgca.cell_density[lgca.nonborder] > 0) & (lgca.cell_density[lgca.nonborder] < lgca.K)
+    coords = [a[relevant] for a in lgca.nonborder]
+    # nbs = lgca.nb_sum(lgca.cell_density)
+    # nbs *= np.clip(1 - nbs / lgca.n_crit, a_min=0, a_max=None)
+    g_adh = lgca.gradient(lgca.cell_density * np.clip(1 - lgca.cell_density / lgca.n_crit, a_min=0, a_max=None))
+
+    resting = lgca.nodes[..., lgca.velocitychannels:].sum(-1)
+    migrating = lgca.cell_density - resting
+    resting = lgca.nb_sum(resting) / lgca.restchannels
+    migrating = lgca.nb_sum(migrating) / lgca.velocitychannels
+    dnrest = np.clip(resting - migrating, a_min=0, a_max=None)
+    g = lgca.calc_flux(lgca.nodes)
+    g = lgca.nb_sum(g)
+
+    for coord in zip(*coords):
+        n = lgca.cell_density[coord]
+        permutations = lgca.permutations[n]
+        restc = permutations[:, lgca.velocitychannels:].sum(-1)
+        j = lgca.j[n]
+        weights = np.exp(
+             lgca.beta_al * np.einsum('i,ij', g[coord], j)
+             + lgca.beta_ag * np.einsum('i,ij', g_adh[coord], j)
+             + lgca.beta_s * dnrest[coord] * restc
+        ).cumsum()
+        ind = bisect_left(weights, random() * weights[-1])
+        newnodes[coord] = permutations[ind]
+
+    lgca.nodes = newnodes
+
+
 def excitable_medium(lgca):
     """
     Model for an excitable medium based on Barkley's PDE model.

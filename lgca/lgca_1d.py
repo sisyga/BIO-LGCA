@@ -126,19 +126,27 @@ class LGCA_1D(LGCA_base):
         ax.xaxis.tick_top()
         return fig, ax
 
-    def plot_density(self, density_t=None, cmap='hot_r', **kwargs):
+    def plot_density(self, density_t=None, cmap='hot_r', cbar=True, vmax=None, **kwargs):
         if density_t is None:
             density_t = self.dens_t
 
+        if vmax is None:
+            K = self.K
+
+        else:
+            K = vmax
+
         tmax = density_t.shape[0]
         fig, ax = self.setup_figure(tmax, **kwargs)
-        cmap = cmap_discretize(cmap, 3 + self.restchannels)
-        plot = ax.imshow(density_t, interpolation='None', vmin=0, vmax=self.K, cmap=cmap)
-        divider = make_axes_locatable(ax)
-        cax = divider.append_axes("right", size=.3, pad=0.1)
-        cbar = colorbar_index(ncolors=3 + self.restchannels, cmap=cmap, use_gridspec=True, cax=cax)
-        cbar.set_label('Particle number $n$')
-        plt.sca(ax)
+        cmap = cmap_discretize(cmap, vmax+1)
+        plot = ax.imshow(density_t, interpolation='None', vmin=0, vmax=vmax, cmap=cmap)
+        if cbar:
+            divider = make_axes_locatable(ax)
+            cax = divider.append_axes("right", size=.3, pad=0.1)
+            cbar = colorbar_index(ncolors=3 + self.restchannels, cmap=cmap, use_gridspec=True, cax=cax)
+            cbar.set_label('Particle number $n$')
+            plt.sca(ax)
+
         return plot
 
     def plot_flux(self, nodes_t=None, **kwargs):
@@ -157,7 +165,7 @@ class LGCA_1D(LGCA_base):
         fix, ax = self.setup_figure(tmax, **kwargs)
         plot = ax.imshow(rgba, interpolation='None', origin='upper')
         plt.xlabel(r'Lattice node $r \, (\varepsilon)$', )
-        plt.ylabel(r'Time step $k \, (\tau)$')
+        plt.ylabel(r'Time $k \, (\tau)$')
         ax.xaxis.set_label_position('top')
         ax.xaxis.set_ticks_position('top')
         ax.xaxis.tick_top()
